@@ -11,12 +11,7 @@ function NewProcess() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-
-    setError("")
-
-    // Basic validation
+  const handleSubmit = async () => {
     if (!processName.trim()) {
       setError("Please enter a process name.")
       return
@@ -32,21 +27,25 @@ function NewProcess() {
       return
     }
 
-    setLoading(true)
-
     try {
-      const response = await fetch("http://127.0.0.1:8000/api/processes", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          industry: industry,
-          process_name: processName,
-          description: description,
-          objective: objective,
-        }),
-      })
+      setLoading(true)
+      setError("")
+
+      const response = await fetch(
+        "http://127.0.0.1:8000/api/processes",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            industry: industry,
+            process_name: processName,
+            description: description,
+            objective: objective,
+          }),
+        }
+      )
 
       if (!response.ok) {
         throw new Error("Failed to create process")
@@ -54,17 +53,10 @@ function NewProcess() {
 
       const data = await response.json()
 
-      console.log("Process created:", data)
+      console.log("Created process:", data)
 
-      // Navigate to the analysis page using the ID
-      navigate(`/process/${data.id}`, {
-        state: {
-          industry,
-          processName,
-          description,
-          objective,
-        },
-      })
+      // Go to the analysis page using the ID
+      navigate(`/process/${data.id}`)
     } catch (err) {
       console.error(err)
 
@@ -79,8 +71,10 @@ function NewProcess() {
   return (
     <div className="min-h-screen bg-slate-50">
 
-      {/* Header */}
+      {/* HEADER */}
+
       <header className="border-b bg-white">
+
         <div className="mx-auto max-w-4xl px-6 py-5">
 
           <h1 className="text-2xl font-bold text-slate-900">
@@ -92,18 +86,20 @@ function NewProcess() {
           </p>
 
         </div>
+
       </header>
 
-      {/* Main */}
+
+      {/* FORM */}
+
       <main className="mx-auto max-w-4xl px-6 py-8">
 
-        <form
-          onSubmit={handleSubmit}
-          className="rounded-xl bg-white p-6 shadow-sm"
-        >
+        <div className="rounded-xl bg-white p-6 shadow-sm">
 
-          {/* Industry */}
+          {/* INDUSTRY */}
+
           <div>
+
             <label className="text-sm font-medium text-slate-700">
               Industry
             </label>
@@ -113,16 +109,21 @@ function NewProcess() {
               onChange={(e) => setIndustry(e.target.value)}
               className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-3"
             >
+
               <option>Retail</option>
               <option>Healthcare</option>
               <option>Finance</option>
               <option>Insurance</option>
               <option>Manufacturing</option>
               <option>Other</option>
+
             </select>
+
           </div>
 
-          {/* Process Name */}
+
+          {/* PROCESS NAME */}
+
           <div className="mt-6">
 
             <label className="text-sm font-medium text-slate-700">
@@ -133,13 +134,15 @@ function NewProcess() {
               type="text"
               value={processName}
               onChange={(e) => setProcessName(e.target.value)}
-              placeholder="e.g. Customer Returns Management"
+              placeholder="e.g. Order Fulfilment"
               className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-3"
             />
 
           </div>
 
-          {/* Description */}
+
+          {/* DESCRIPTION */}
+
           <div className="mt-6">
 
             <label className="text-sm font-medium text-slate-700">
@@ -156,7 +159,9 @@ function NewProcess() {
 
           </div>
 
-          {/* Business Objective */}
+
+          {/* OBJECTIVE */}
+
           <div className="mt-6">
 
             <label className="text-sm font-medium text-slate-700">
@@ -173,23 +178,27 @@ function NewProcess() {
 
           </div>
 
-          {/* Error */}
+
+          {/* ERROR */}
+
           {error && (
-            <div className="mt-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            <div className="mt-6 rounded-lg bg-red-50 p-4 text-sm text-red-700">
               {error}
             </div>
           )}
 
-          {/* Submit */}
+
+          {/* BUTTON */}
+
           <button
-            type="submit"
+            onClick={handleSubmit}
             disabled={loading}
             className="mt-8 rounded-lg bg-slate-900 px-5 py-3 font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
           >
             {loading ? "Creating Process..." : "Analyse Process"}
           </button>
 
-        </form>
+        </div>
 
       </main>
 

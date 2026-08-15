@@ -1,5 +1,6 @@
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+
 from sqlalchemy.orm import Session
 
 from database import Base, engine, get_db
@@ -75,19 +76,24 @@ def create_process(
 # ---------------------------------------------------------
 
 @app.get(
-    "/api/processes",
-    response_model=list[ProcessResponse]
+    "/api/processes/{process_id}",
+    response_model=ProcessResponse
 )
-def get_processes(
+def get_process(
+    process_id: int,
     db: Session = Depends(get_db)
 ):
+    process = db.query(Process).filter(
+        Process.id == process_id
+    ).first()
 
-    return db.query(Process).all()
+    if process is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Process not found"
+        )
 
-
-# ---------------------------------------------------------
-# Get One Process
-# ---------------------------------------------------------
+    return process
 
 @app.get(
     "/api/processes/{process_id}",
