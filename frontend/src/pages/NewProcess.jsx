@@ -1,77 +1,126 @@
+import { useState } from "react"
+import { useNavigate } from "react-router-dom"
+
+
 function NewProcess() {
+  const navigate = useNavigate()
+
+  const [industry, setIndustry] = useState("Retail")
+  const [processName, setProcessName] = useState("")
+  const [description, setDescription] = useState("")
+  const [objective, setObjective] = useState("")
   return (
     <div className="min-h-screen bg-slate-50">
 
       <header className="border-b bg-white">
         <div className="mx-auto max-w-4xl px-6 py-5">
-          <h1 className="text-2xl font-bold">
+
+          <h1 className="text-2xl font-bold text-slate-900">
             Create New Process
           </h1>
 
           <p className="mt-1 text-sm text-slate-500">
             Enter a business process for AI analysis.
           </p>
+
         </div>
       </header>
+
 
       <main className="mx-auto max-w-4xl px-6 py-8">
 
         <div className="rounded-xl bg-white p-6 shadow-sm">
 
           <div>
-            <label className="text-sm font-medium">
+            <label className="text-sm font-medium text-slate-700">
               Industry
             </label>
 
-            <select className="mt-2 w-full rounded-lg border px-4 py-3">
-              <option>Retail</option>
-              <option>Healthcare</option>
-              <option>Finance</option>
-              <option>Insurance</option>
-              <option>Manufacturing</option>
-              <option>Other</option>
-            </select>
+            <select
+                value={industry}
+                onChange={(e) => setIndustry(e.target.value)}
+                className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-3"
+              >
+                <option>Retail</option>
+                <option>Healthcare</option>
+                <option>Finance</option>
+                <option>Insurance</option>
+                <option>Manufacturing</option>
+                <option>Other</option>
+              </select>
           </div>
 
+
           <div className="mt-6">
-            <label className="text-sm font-medium">
+
+            <label className="text-sm font-medium text-slate-700">
               Process Name
             </label>
 
             <input
-              type="text"
+            type="text"
+              value={processName}
+              onChange={(e) => setProcessName(e.target.value)}
               placeholder="e.g. Order Fulfilment"
-              className="mt-2 w-full rounded-lg border px-4 py-3"
+              className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-3"
             />
+
           </div>
 
+
           <div className="mt-6">
-            <label className="text-sm font-medium">
+
+            <label className="text-sm font-medium text-slate-700">
               Process Description
             </label>
 
             <textarea
-              rows="5"
-              placeholder="Describe how the process currently works..."
-              className="mt-2 w-full rounded-lg border px-4 py-3"
-            />
+                rows="5"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Describe how the process currently works..."
+                className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-3"
+              />
+
           </div>
 
+
           <div className="mt-6">
-            <label className="text-sm font-medium">
+
+            <label className="text-sm font-medium text-slate-700">
               Business Objective
             </label>
 
             <textarea
-              rows="3"
-              placeholder="What should the future process improve?"
-              className="mt-2 w-full rounded-lg border px-4 py-3"
-            />
+                rows="3"
+                value={objective}
+                onChange={(e) => setObjective(e.target.value)}
+                placeholder="What should the future process improve?"
+                className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-3"
+              />
           </div>
 
-          <button className="mt-8 rounded-lg bg-slate-900 px-5 py-3 font-medium text-white">
-            Analyse Process
-          </button>
+
+          <button
+          onClick={() => {
+            if (!processName.trim()) {
+              alert("Please enter a process name")
+              return
+            }
+
+            navigate("/process/1", {
+              state: {
+                industry,
+                processName,
+                description,
+                objective
+              }
+            })
+          }}
+          className="mt-8 rounded-lg bg-slate-900 px-5 py-3 font-medium text-white"
+        >
+          Analyse Process
+</button>
 
         </div>
 
