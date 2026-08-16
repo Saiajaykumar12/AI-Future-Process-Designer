@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 
-const API_BASE_URL = "http://127.0.0.1:8000"
-
 function Comparison() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -16,33 +14,33 @@ function Comparison() {
     const loadData = async () => {
       try {
         setLoading(true)
+        setError("")
 
         const processResponse = await fetch(
-          `${API_BASE_URL}/api/processes/${id}`
+          `http://127.0.0.1:8000/api/processes/${id}`
         )
 
-        const processData = await processResponse.json()
-
         if (!processResponse.ok) {
-          throw new Error(
-            processData.detail || "Could not load process"
-          )
+          throw new Error("Process not found")
         }
 
+        const processData = await processResponse.json()
         setProcess(processData)
 
         const analysisResponse = await fetch(
-          `${API_BASE_URL}/api/analyses/process/${id}`
+          `http://127.0.0.1:8000/api/analyses/process/${id}`
         )
 
-        if (analysisResponse.ok) {
-          const analysisData = await analysisResponse.json()
-          setAnalysis(analysisData)
+        if (!analysisResponse.ok) {
+          throw new Error("Analysis not found")
         }
+
+        const analysisData = await analysisResponse.json()
+        setAnalysis(analysisData)
 
       } catch (err) {
         console.error("COMPARISON ERROR:", err)
-        setError(err.message || "Could not load comparison")
+        setError(err.message)
       } finally {
         setLoading(false)
       }
@@ -65,59 +63,72 @@ function Comparison() {
   }
 
 
-  if (error || !process) {
+  if (error || !process || !analysis) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50">
-        <div className="rounded-xl bg-white p-8 shadow-sm">
+
+        <div className="rounded-xl bg-white p-8 text-center shadow-sm">
 
           <p className="text-red-600">
-            {error || "Process not found"}
+            {error || "Could not load comparison."}
           </p>
 
           <button
             onClick={() => navigate(`/process/${id}`)}
-            className="mt-5 rounded-lg bg-slate-900 px-5 py-3 font-medium text-white"
+            className="mt-5 rounded-lg bg-slate-900 px-5 py-3 text-sm font-medium text-white"
           >
             Back to Analysis
           </button>
 
         </div>
+
       </div>
     )
   }
 
 
   let currentProcess = []
-  let problems = []
-  let opportunities = []
   let futureProcess = []
+  let opportunities = []
 
-  if (analysis) {
-    try {
-      currentProcess =
-        typeof analysis.current_process === "string"
-          ? JSON.parse(analysis.current_process || "[]")
-          : analysis.current_process || []
+  try {
+    currentProcess = JSON.parse(
+      analysis.current_process || "[]"
+    )
 
-      problems =
-        typeof analysis.problems === "string"
-          ? JSON.parse(analysis.problems || "[]")
-          : analysis.problems || []
+    futureProcess = JSON.parse(
+      analysis.future_process || "[]"
+    )
 
-      opportunities =
-        typeof analysis.opportunities === "string"
-          ? JSON.parse(analysis.opportunities || "[]")
-          : analysis.opportunities || []
-
-      futureProcess =
-        typeof analysis.future_process === "string"
-          ? JSON.parse(analysis.future_process || "[]")
-          : analysis.future_process || []
-
-    } catch (err) {
-      console.error("Comparison parsing error:", err)
-    }
+    opportunities = JSON.parse(
+      analysis.opportunities || "[]"
+    )
+  } catch (err) {
+    console.error("Comparison parsing error:", err)
   }
+
+
+  const comparisonRows = currentProcess.map(
+    (currentStep, index) => {
+
+      const futureStep = futureProcess[index]
+
+      const opportunity = opportunities[index]
+
+      return {
+        current: currentStep,
+        transition: opportunity
+          ? opportunity.title
+          : "AI-enabled improvement",
+        future: futureStep
+          ? futureStep.activity
+          : "Future-state activity",
+        responsibility: futureStep
+          ? futureStep.responsibility
+          : "AI",
+      }
+    }
+  )
 
 
   return (
@@ -129,6 +140,13 @@ function Comparison() {
 
         <div className="mx-auto max-w-7xl px-6 py-6">
 
+          <button
+            onClick={() => navigate(`/process/${id}`)}
+            className="mb-4 text-sm text-slate-500 hover:text-slate-900"
+          >
+            ← Back to Analysis
+          </button>
+
           <p className="text-sm text-slate-500">
             {process.industry} / {process.process_name}
           </p>
@@ -138,7 +156,7 @@ function Comparison() {
           </h1>
 
           <p className="mt-2 text-sm text-slate-500">
-            Compare the existing business process with the AI-powered future process.
+            Compare the existing process with the AI-enabled future state.
           </p>
 
         </div>
@@ -146,7 +164,55 @@ function Comparison() {
       </header>
 
 
+      {/* MAIN */}
+
       <main className="mx-auto max-w-7xl space-y-6 px-6 py-8">
+
+
+        {/* SUMMARY */}
+
+        <section className="grid gap-4 md:grid-cols-3">
+
+          <div className="rounded-xl bg-white p-5 shadow-sm">
+
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+              Current Steps
+            </p>
+
+            <p className="mt-2 text-3xl font-bold text-slate-900">
+              {currentProcess.length}
+            </p>
+
+          </div>
+
+
+          <div className="rounded-xl bg-white p-5 shadow-sm">
+
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+              AI Opportunities
+            </p>
+
+            <p className="mt-2 text-3xl font-bold text-slate-900">
+              {opportunities.length}
+            </p>
+
+          </div>
+
+
+          <div className="rounded-xl bg-white p-5 shadow-sm">
+
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+              Future Steps
+            </p>
+
+            <p className="mt-2 text-3xl font-bold text-slate-900">
+              {futureProcess.length}
+            </p>
+
+          </div>
+
+        </section>
+
 
         {/* COMPARISON TABLE */}
 
@@ -154,77 +220,68 @@ function Comparison() {
 
           <div className="grid grid-cols-3 border-b">
 
-            <div className="bg-slate-100 p-5 font-semibold">
+            <div className="bg-slate-100 p-5 font-semibold text-slate-700">
               CURRENT
             </div>
 
-            <div className="bg-slate-100 p-5 font-semibold">
+            <div className="bg-slate-100 p-5 font-semibold text-slate-700">
               TRANSITION
             </div>
 
-            <div className="bg-slate-100 p-5 font-semibold">
+            <div className="bg-slate-100 p-5 font-semibold text-slate-700">
               FUTURE
             </div>
 
           </div>
 
 
-          {futureProcess.length > 0 ? (
+          {comparisonRows.length > 0 ? (
 
-            futureProcess.map((future, index) => {
+            comparisonRows.map((item, index) => (
 
-              const current =
-                currentProcess[index] ||
-                "Existing process activity"
+              <div
+                key={index}
+                className="grid grid-cols-3 border-b last:border-b-0"
+              >
 
-              const opportunity =
-                opportunities[index]
+                <div className="p-5">
 
-              const transition =
-                opportunity?.title
-                  ? `Introduce ${opportunity.title}`
-                  : "Introduce AI assistance"
-
-              const currentText =
-                typeof current === "string"
-                  ? current
-                  : current.activity ||
-                    current.name ||
-                    "Current activity"
-
-              const futureText =
-                typeof future === "string"
-                  ? future
-                  : future.activity ||
-                    future.name ||
-                    "Future activity"
-
-              return (
-                <div
-                  key={index}
-                  className="grid grid-cols-3 border-b last:border-b-0"
-                >
-
-                  <div className="p-5 text-sm">
-                    {currentText}
-                  </div>
-
-                  <div className="border-x p-5 text-sm text-slate-600">
-                    {transition}
-                  </div>
-
-                  <div className="p-5 text-sm font-medium">
-                    {futureText}
-                  </div>
+                  <p className="text-sm text-slate-700">
+                    {item.current}
+                  </p>
 
                 </div>
-              )
-            })
+
+
+                <div className="border-x p-5">
+
+                  <p className="text-sm text-slate-600">
+                    {item.transition}
+                  </p>
+
+                </div>
+
+
+                <div className="p-5">
+
+                  <p className="text-sm font-medium text-slate-900">
+                    {item.future}
+                  </p>
+
+                  <span className="mt-2 inline-block rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-600">
+                    {item.responsibility}
+                  </span>
+
+                </div>
+
+              </div>
+
+            ))
 
           ) : (
 
             <div className="p-8 text-center text-sm text-slate-500">
-              No AI comparison data available yet.
+              No comparison data available.
             </div>
 
           )}
@@ -232,137 +289,47 @@ function Comparison() {
         </section>
 
 
-        {/* PROBLEMS */}
-
-        {problems.length > 0 && (
-
-          <section className="rounded-xl bg-white p-6 shadow-sm">
-
-            <h2 className="text-lg font-semibold">
-              Problems Addressed
-            </h2>
-
-            <div className="mt-5 space-y-3">
-
-              {problems.map((item, index) => (
-
-                <div
-                  key={index}
-                  className="rounded-lg border p-4"
-                >
-
-                  <div className="flex items-center justify-between">
-
-                    <p className="font-medium">
-                      {item.activity || "Process activity"}
-                    </p>
-
-                    <span className="rounded-full bg-red-100 px-3 py-1 text-xs text-red-700">
-                      {item.severity || "Medium"}
-                    </span>
-
-                  </div>
-
-                  <p className="mt-2 text-sm text-slate-500">
-                    {item.problem || item.description}
-                  </p>
-
-                </div>
-
-              ))}
-
-            </div>
-
-          </section>
-
-        )}
-
-
         {/* AI OPPORTUNITIES */}
 
-        {opportunities.length > 0 && (
+        <section className="rounded-xl bg-white p-6 shadow-sm">
 
-          <section className="rounded-xl bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-slate-900">
+            AI Transformation Opportunities
+          </h2>
 
-            <h2 className="text-lg font-semibold">
-              AI Transformation Opportunities
-            </h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Key opportunities identified by the AI analysis.
+          </p>
 
-            <div className="mt-5 grid gap-4 md:grid-cols-3">
 
-              {opportunities.map((item, index) => (
+          <div className="mt-5 grid gap-4 md:grid-cols-3">
 
-                <div
-                  key={index}
-                  className="rounded-lg border p-5"
-                >
+            {opportunities.map((item, index) => (
 
-                  <h3 className="font-semibold">
-                    {item.title || "AI Opportunity"}
-                  </h3>
+              <div
+                key={index}
+                className="rounded-lg border p-5"
+              >
 
-                  <p className="mt-2 text-sm text-slate-500">
-                    {item.description || ""}
-                  </p>
-
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-900 text-sm font-medium text-white">
+                  {index + 1}
                 </div>
 
-              ))}
+                <h3 className="mt-4 font-semibold text-slate-900">
+                  {item.title}
+                </h3>
 
-            </div>
+                <p className="mt-2 text-sm leading-6 text-slate-500">
+                  {item.description}
+                </p>
 
-          </section>
+              </div>
 
-        )}
+            ))}
 
+          </div>
 
-        {/* PROCESS RESPONSIBILITIES */}
-
-        {futureProcess.length > 0 && (
-
-          <section className="rounded-xl bg-white p-6 shadow-sm">
-
-            <h2 className="text-lg font-semibold">
-              Future Process Responsibilities
-            </h2>
-
-            <div className="mt-5 space-y-3">
-
-              {futureProcess.map((item, index) => (
-
-                <div
-                  key={index}
-                  className="flex items-center gap-4"
-                >
-
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-900 text-sm text-white">
-                    {index + 1}
-                  </div>
-
-                  <div className="flex flex-1 items-center justify-between rounded-lg border p-4">
-
-                    <span className="font-medium">
-                      {item.activity ||
-                        item.name ||
-                        "Process activity"}
-                    </span>
-
-                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs">
-                      {item.responsibility ||
-                        "AI / Human"}
-                    </span>
-
-                  </div>
-
-                </div>
-
-              ))}
-
-            </div>
-
-          </section>
-
-        )}
+        </section>
 
 
         {/* ACTIONS */}
@@ -371,14 +338,14 @@ function Comparison() {
 
           <button
             onClick={() => navigate(`/process/${id}`)}
-            className="rounded-lg border bg-white px-5 py-3 font-medium"
+            className="rounded-lg border border-slate-300 bg-white px-5 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
           >
-            Back to Analysis
+            ← Back to Analysis
           </button>
 
           <button
             onClick={() => navigate("/")}
-            className="rounded-lg bg-slate-900 px-5 py-3 font-medium text-white"
+            className="rounded-lg bg-slate-900 px-5 py-3 text-sm font-medium text-white hover:bg-slate-800"
           >
             Dashboard
           </button>

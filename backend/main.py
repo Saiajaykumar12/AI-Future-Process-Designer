@@ -2,6 +2,8 @@ from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
+import json
+
 from database import Base, engine, get_db
 from models import Process, Analysis
 from schemas import (
@@ -14,7 +16,16 @@ from schemas import (
 from ai_service import generate_process_analysis
 
 
+# ---------------------------------------------------------
+# DATABASE
+# ---------------------------------------------------------
+
 Base.metadata.create_all(bind=engine)
+
+
+# ---------------------------------------------------------
+# APP
+# ---------------------------------------------------------
 
 app = FastAPI(
     title="AI Future Process Designer API"
@@ -38,7 +49,7 @@ app.add_middleware(
 
 
 # ---------------------------------------------------------
-# Root
+# ROOT
 # ---------------------------------------------------------
 
 @app.get("/")
@@ -49,7 +60,7 @@ def root():
 
 
 # ---------------------------------------------------------
-# Create Process
+# CREATE PROCESS
 # ---------------------------------------------------------
 
 @app.post(
@@ -65,6 +76,7 @@ def create_process(
         process_name=process.process_name,
         description=process.description,
         objective=process.objective,
+        status="Pending",
     )
 
     db.add(new_process)
@@ -75,7 +87,7 @@ def create_process(
 
 
 # ---------------------------------------------------------
-# Get All Processes
+# GET ALL PROCESSES
 # ---------------------------------------------------------
 
 @app.get(
@@ -85,11 +97,15 @@ def create_process(
 def get_processes(
     db: Session = Depends(get_db)
 ):
-    return db.query(Process).order_by(Process.id.desc()).all()
+    return (
+        db.query(Process)
+        .order_by(Process.id.desc())
+        .all()
+    )
 
 
 # ---------------------------------------------------------
-# Get Single Process
+# GET SINGLE PROCESS
 # ---------------------------------------------------------
 
 @app.get(
@@ -100,9 +116,11 @@ def get_process(
     process_id: int,
     db: Session = Depends(get_db)
 ):
-    process = db.query(Process).filter(
-        Process.id == process_id
-    ).first()
+    process = (
+        db.query(Process)
+        .filter(Process.id == process_id)
+        .first()
+    )
 
     if process is None:
         raise HTTPException(
@@ -114,7 +132,7 @@ def get_process(
 
 
 # ---------------------------------------------------------
-# Generate AI Analysis
+# GENERATE AI ANALYSIS
 # ---------------------------------------------------------
 
 @app.post(
@@ -125,9 +143,11 @@ def generate_analysis(
     process_id: int,
     db: Session = Depends(get_db)
 ):
-    process = db.query(Process).filter(
-        Process.id == process_id
-    ).first()
+    process = (
+        db.query(Process)
+        .filter(Process.id == process_id)
+        .first()
+    )
 
     if process is None:
         raise HTTPException(
@@ -143,6 +163,14 @@ def generate_analysis(
             objective=process.objective,
         )
 
+        result = json.loads(ai_result)
+
+    except json.JSONDecodeError:
+        raise HTTPException(
+            status_code=500,
+            detail="AI returned invalid JSON"
+        )
+
     except Exception as e:
         print("AI ERROR:", e)
 
@@ -151,34 +179,51 @@ def generate_analysis(
             detail=f"AI analysis failed: {str(e)}"
         )
 
-    import json
+    # Make sure all expected fields exist
+    current_process = result.get(
+        "current_process",
+        []
+    )
 
-    try:
-        result = json.loads(ai_result)
-    except json.JSONDecodeError:
-        raise HTTPException(
-            status_code=500,
-            detail="AI returned invalid JSON"
-        )
+    problems = result.get(
+        "problems",
+        []
+    )
 
+    opportunities = result.get(
+        "opportunities",
+        []
+    )
+
+    future_process = result.get(
+        "future_process",
+        []
+    )
+
+    # Save analysis
     new_analysis = Analysis(
         process_id=process.id,
+
         current_process=json.dumps(
-            result.get("current_process", [])
+            current_process
         ),
+
         problems=json.dumps(
-            result.get("problems", [])
+            problems
         ),
+
         opportunities=json.dumps(
-            result.get("opportunities", [])
+            opportunities
         ),
+
         future_process=json.dumps(
-            result.get("future_process", [])
+            future_process
         ),
     )
 
     db.add(new_analysis)
 
+    # Update process status
     process.status = "Analysed"
 
     db.commit()
@@ -188,7 +233,7 @@ def generate_analysis(
 
 
 # ---------------------------------------------------------
-# Create Analysis Manually
+# CREATE ANALYSIS MANUALLY
 # ---------------------------------------------------------
 
 @app.post(
@@ -199,9 +244,11 @@ def create_analysis(
     analysis: AnalysisCreate,
     db: Session = Depends(get_db)
 ):
-    process = db.query(Process).filter(
-        Process.id == analysis.process_id
-    ).first()
+    process = (
+        db.query(Process)
+        .filter(Process.id == analysis.process_id)
+        .first()
+    )
 
     if process is None:
         raise HTTPException(
@@ -228,7 +275,7 @@ def create_analysis(
 
 
 # ---------------------------------------------------------
-# Get Analysis
+# GET LATEST ANALYSIS FOR PROCESS
 # ---------------------------------------------------------
 
 @app.get(
@@ -239,9 +286,12 @@ def get_analysis(
     process_id: int,
     db: Session = Depends(get_db)
 ):
-    analysis = db.query(Analysis).filter(
-        Analysis.process_id == process_id
-    ).order_by(Analysis.id.desc()).first()
+    analysis = (
+        db.query(Analysis)
+        .filter(Analysis.process_id == process_id)
+        .order_by(Analysis.id.desc())
+        .first()
+    )
 
     if analysis is None:
         raise HTTPException(

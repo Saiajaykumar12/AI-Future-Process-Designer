@@ -21,7 +21,7 @@ def generate_process_analysis(
     prompt = f"""
 You are an expert business process transformation consultant.
 
-Analyse the following business process and provide a practical
+Analyse the following business process and design a practical
 AI-enabled future-state process.
 
 Industry:
@@ -36,7 +36,9 @@ Current Process Description:
 Business Objective:
 {objective}
 
-Return ONLY valid JSON in exactly this structure:
+Return ONLY valid JSON.
+
+Use exactly this structure:
 
 {{
   "current_process": [
@@ -65,23 +67,32 @@ Return ONLY valid JSON in exactly this structure:
   ]
 }}
 
-Requirements:
+Rules:
 
-- Identify realistic process steps from the description.
-- Identify important operational problems.
-- Severity must be High, Medium, or Low.
-- Suggest practical AI opportunities.
-- Clearly distinguish AI, Human, and System responsibilities.
-- Keep the recommendations relevant to the industry.
-- Do not invent unrelated business activities.
+1. Identify realistic current process steps only from the description.
+2. Identify the most important operational problems.
+3. Severity must be exactly one of:
+   High, Medium, Low.
+4. Suggest practical AI opportunities.
+5. Clearly distinguish:
+   AI, Human, and System responsibilities.
+6. Keep recommendations relevant to the specified industry.
+7. Do not invent unrelated business activities.
+8. The future process should improve the current process and address
+   the stated business objective.
+9. Keep the output concise and practical.
+10. Return valid JSON only. Do not include markdown or ```json.
 """
 
     response = client.models.generate_content(
         model="gemini-2.5-flash",
         contents=prompt,
         config={
-            "response_mime_type": "application/json"
+            "response_mime_type": "application/json",
         },
     )
+
+    if not response.text:
+        raise ValueError("Gemini returned an empty response")
 
     return response.text

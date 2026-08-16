@@ -11,25 +11,28 @@ function NewProcess() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+
+    setError("")
+
     if (!processName.trim()) {
       setError("Please enter a process name.")
       return
     }
 
     if (!description.trim()) {
-      setError("Please enter a process description.")
+      setError("Please describe the current process.")
       return
     }
 
     if (!objective.trim()) {
-      setError("Please enter a business objective.")
+      setError("Please enter the business objective.")
       return
     }
 
     try {
       setLoading(true)
-      setError("")
 
       const response = await fetch(
         "http://127.0.0.1:8000/api/processes",
@@ -39,34 +42,35 @@ function NewProcess() {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            industry: industry,
-            process_name: processName,
-            description: description,
-            objective: objective,
+            industry,
+            process_name: processName.trim(),
+            description: description.trim(),
+            objective: objective.trim(),
           }),
         }
       )
 
-      if (!response.ok) {
-        throw new Error("Failed to create process")
-      }
-
       const data = await response.json()
 
-      console.log("Created process:", data)
+      if (!response.ok) {
+        throw new Error(
+          data.detail || "Could not create process."
+        )
+      }
 
-      // Go to the analysis page using the ID
       navigate(`/process/${data.id}`)
+
     } catch (err) {
-      console.error(err)
+      console.error("CREATE PROCESS ERROR:", err)
 
       setError(
-        "Could not connect to the backend. Make sure your FastAPI server is running."
+        err.message || "Could not connect to the backend."
       )
     } finally {
       setLoading(false)
     }
   }
+
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -75,14 +79,22 @@ function NewProcess() {
 
       <header className="border-b bg-white">
 
-        <div className="mx-auto max-w-4xl px-6 py-5">
+        <div className="mx-auto max-w-4xl px-6 py-6">
+
+          <button
+            onClick={() => navigate("/")}
+            className="mb-4 text-sm text-slate-500 hover:text-slate-900"
+          >
+            ← Back to Dashboard
+          </button>
 
           <h1 className="text-2xl font-bold text-slate-900">
             Create New Process
           </h1>
 
-          <p className="mt-1 text-sm text-slate-500">
-            Enter a business process for AI analysis.
+          <p className="mt-2 text-sm text-slate-500">
+            Describe your current business process and let AI
+            identify opportunities for transformation.
           </p>
 
         </div>
@@ -90,33 +102,40 @@ function NewProcess() {
       </header>
 
 
-      {/* FORM */}
+      {/* MAIN */}
 
       <main className="mx-auto max-w-4xl px-6 py-8">
 
-        <div className="rounded-xl bg-white p-6 shadow-sm">
+        <form
+          onSubmit={handleSubmit}
+          className="rounded-2xl bg-white p-6 shadow-sm md:p-8"
+        >
 
           {/* INDUSTRY */}
 
           <div>
 
-            <label className="text-sm font-medium text-slate-700">
+            <label className="text-sm font-semibold text-slate-700">
               Industry
             </label>
+
+            <p className="mt-1 text-xs text-slate-500">
+              Select the industry that best matches your process.
+            </p>
 
             <select
               value={industry}
               onChange={(e) => setIndustry(e.target.value)}
-              className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-3"
+              className="mt-3 w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-900 focus:ring-1 focus:ring-slate-900"
             >
-
               <option>Retail</option>
               <option>Healthcare</option>
               <option>Finance</option>
               <option>Insurance</option>
               <option>Manufacturing</option>
+              <option>Logistics</option>
+              <option>Education</option>
               <option>Other</option>
-
             </select>
 
           </div>
@@ -126,16 +145,20 @@ function NewProcess() {
 
           <div className="mt-6">
 
-            <label className="text-sm font-medium text-slate-700">
+            <label className="text-sm font-semibold text-slate-700">
               Process Name
             </label>
+
+            <p className="mt-1 text-xs text-slate-500">
+              Give the business process a clear name.
+            </p>
 
             <input
               type="text"
               value={processName}
               onChange={(e) => setProcessName(e.target.value)}
               placeholder="e.g. Order Fulfilment"
-              className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-3"
+              className="mt-3 w-full rounded-lg border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-slate-900 focus:ring-1 focus:ring-slate-900"
             />
 
           </div>
@@ -145,16 +168,29 @@ function NewProcess() {
 
           <div className="mt-6">
 
-            <label className="text-sm font-medium text-slate-700">
-              Process Description
-            </label>
+            <div className="flex items-center justify-between">
+
+              <label className="text-sm font-semibold text-slate-700">
+                Current Process Description
+              </label>
+
+              <span className="text-xs text-slate-400">
+                {description.length} characters
+              </span>
+
+            </div>
+
+            <p className="mt-1 text-xs text-slate-500">
+              Explain how the process currently works, including
+              important manual activities and decisions.
+            </p>
 
             <textarea
-              rows="5"
+              rows="7"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Describe how the process currently works..."
-              className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-3"
+              placeholder="Example: Customers place orders through the website. Staff manually check inventory, pick items, pack the order and arrange shipping..."
+              className="mt-3 w-full resize-none rounded-lg border border-slate-300 px-4 py-3 text-sm leading-6 outline-none transition focus:border-slate-900 focus:ring-1 focus:ring-slate-900"
             />
 
           </div>
@@ -164,16 +200,28 @@ function NewProcess() {
 
           <div className="mt-6">
 
-            <label className="text-sm font-medium text-slate-700">
-              Business Objective
-            </label>
+            <div className="flex items-center justify-between">
+
+              <label className="text-sm font-semibold text-slate-700">
+                Business Objective
+              </label>
+
+              <span className="text-xs text-slate-400">
+                {objective.length} characters
+              </span>
+
+            </div>
+
+            <p className="mt-1 text-xs text-slate-500">
+              What should the future process improve?
+            </p>
 
             <textarea
-              rows="3"
+              rows="4"
               value={objective}
               onChange={(e) => setObjective(e.target.value)}
-              placeholder="What should the future process improve?"
-              className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-3"
+              placeholder="Example: Reduce processing time, minimise errors and improve customer satisfaction."
+              className="mt-3 w-full resize-none rounded-lg border border-slate-300 px-4 py-3 text-sm leading-6 outline-none transition focus:border-slate-900 focus:ring-1 focus:ring-slate-900"
             />
 
           </div>
@@ -182,21 +230,92 @@ function NewProcess() {
           {/* ERROR */}
 
           {error && (
-            <div className="mt-6 rounded-lg bg-red-50 p-4 text-sm text-red-700">
-              {error}
+
+            <div className="mt-6 rounded-lg border border-red-200 bg-red-50 p-4">
+
+              <p className="text-sm text-red-700">
+                {error}
+              </p>
+
             </div>
+
           )}
 
 
-          {/* BUTTON */}
+          {/* ACTIONS */}
 
-          <button
-            onClick={handleSubmit}
-            disabled={loading}
-            className="mt-8 rounded-lg bg-slate-900 px-5 py-3 font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {loading ? "Creating Process..." : "Analyse Process"}
-          </button>
+          <div className="mt-8 flex flex-col-reverse gap-3 border-t pt-6 sm:flex-row sm:justify-end">
+
+            <button
+              type="button"
+              onClick={() => navigate("/")}
+              className="rounded-lg border border-slate-300 bg-white px-5 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+            >
+              Cancel
+            </button>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="rounded-lg bg-slate-900 px-5 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {loading
+                ? "Creating Process..."
+                : "Create & Analyse →"}
+            </button>
+
+          </div>
+
+        </form>
+
+
+        {/* INFORMATION */}
+
+        <div className="mt-6 rounded-xl border border-slate-200 bg-white p-5">
+
+          <h2 className="text-sm font-semibold text-slate-900">
+            What happens next?
+          </h2>
+
+          <div className="mt-4 grid gap-4 md:grid-cols-3">
+
+            <div>
+
+              <div className="text-sm font-semibold">
+                01. Process saved
+              </div>
+
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                Your process is securely stored in the application database.
+              </p>
+
+            </div>
+
+            <div>
+
+              <div className="text-sm font-semibold">
+                02. AI analysis
+              </div>
+
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                Gemini analyses the process and identifies problems and AI opportunities.
+              </p>
+
+            </div>
+
+            <div>
+
+              <div className="text-sm font-semibold">
+                03. Future state
+              </div>
+
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                Review the AI-enabled future process and compare it with the current state.
+              </p>
+
+            </div>
+
+          </div>
 
         </div>
 
