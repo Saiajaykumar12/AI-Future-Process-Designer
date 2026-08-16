@@ -1,188 +1,239 @@
 import { useEffect, useState } from "react"
-import { useParams, useNavigate } from "react-router-dom"
+import { useNavigate, useParams } from "react-router-dom"
+
+const API_BASE_URL = "http://127.0.0.1:8000"
 
 function Analysis() {
-  const { processId } = useParams()
+  const { id } = useParams()
   const navigate = useNavigate()
 
   const [process, setProcess] = useState(null)
+  const [analysis, setAnalysis] = useState(null)
+
   const [loading, setLoading] = useState(true)
+  const [generating, setGenerating] = useState(false)
+
   const [error, setError] = useState("")
+  const [analysisError, setAnalysisError] = useState("")
+
+  // ---------------------------------------------------------
+  // LOAD PROCESS
+  // ---------------------------------------------------------
 
   useEffect(() => {
-    const fetchProcess = async () => {
+    const loadProcess = async () => {
+      setLoading(true)
+      setError("")
+
       try {
-        setLoading(true)
-        setError("")
-
         const response = await fetch(
-          `http://127.0.0.1:8000/api/processes/${processId}`
+          `${API_BASE_URL}/api/processes/${id}`
         )
-
-        if (!response.ok) {
-          throw new Error("Process could not be found")
-        }
 
         const data = await response.json()
 
+        if (!response.ok) {
+          throw new Error(
+            data.detail || "Process not found"
+          )
+        }
+
         setProcess(data)
       } catch (err) {
-        console.error("Error fetching process:", err)
+        console.error("PROCESS LOAD ERROR:", err)
 
         setError(
-          "Could not load the process from the backend. Make sure your FastAPI server is running."
+          err.message || "Could not load process"
         )
       } finally {
         setLoading(false)
       }
     }
 
-    if (processId) {
-      fetchProcess()
-    } else {
-      setError("No process ID was provided.")
-      setLoading(false)
+    if (id) {
+      loadProcess()
     }
-  }, [processId])
+  }, [id])
 
-  // -----------------------------
+
+  // ---------------------------------------------------------
+  // LOAD EXISTING AI ANALYSIS
+  // ---------------------------------------------------------
+
+  useEffect(() => {
+    const loadAnalysis = async () => {
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/api/analyses/process/${id}`
+        )
+
+        // 404 simply means analysis has not been generated yet.
+        if (response.status === 404) {
+          setAnalysis(null)
+          return
+        }
+
+        const data = await response.json()
+
+        if (!response.ok) {
+          throw new Error(
+            data.detail || "Could not load analysis"
+          )
+        }
+
+        setAnalysis(data)
+      } catch (err) {
+        console.error("ANALYSIS LOAD ERROR:", err)
+
+        setAnalysisError(
+          err.message || "Could not load existing analysis"
+        )
+      }
+    }
+
+    if (id) {
+      loadAnalysis()
+    }
+  }, [id])
+
+
+  // ---------------------------------------------------------
+  // GENERATE AI ANALYSIS
+  // ---------------------------------------------------------
+
+  const generateAIAnalysis = async () => {
+    setGenerating(true)
+    setError("")
+    setAnalysisError("")
+
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/analyses/generate/${id}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      )
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(
+          data.detail || "AI analysis failed"
+        )
+      }
+
+      setAnalysis(data)
+    } catch (err) {
+      console.error("AI ANALYSIS ERROR:", err)
+
+      setError(
+        err.message || "Could not generate AI analysis."
+      )
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+
+  // ---------------------------------------------------------
   // LOADING
-  // -----------------------------
+  // ---------------------------------------------------------
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="rounded-xl bg-white p-8 shadow-sm text-center">
-          <p className="text-lg font-medium text-slate-900">
+      <div className="flex min-h-screen items-center justify-center bg-slate-50">
+        <div className="rounded-xl bg-white p-8 shadow-sm">
+          <p className="text-slate-600">
             Loading process...
-          </p>
-
-          <p className="mt-2 text-sm text-slate-500">
-            Fetching process information from the backend.
           </p>
         </div>
       </div>
     )
   }
 
-  // -----------------------------
-  // ERROR
-  // -----------------------------
 
-  if (error) {
+  // ---------------------------------------------------------
+  // PROCESS NOT FOUND
+  // ---------------------------------------------------------
+
+  if (!process) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center px-6">
-        <div className="max-w-lg rounded-xl bg-white p-8 shadow-sm text-center">
-
-          <h1 className="text-xl font-bold text-red-600">
-            Unable to Load Process
-          </h1>
-
-          <p className="mt-3 text-sm text-slate-600">
-            {error}
+      <div className="flex min-h-screen items-center justify-center bg-slate-50">
+        <div className="rounded-xl bg-white p-8 shadow-sm">
+          <p className="text-red-600">
+            {error || "Process not found"}
           </p>
 
           <button
             onClick={() => navigate("/")}
-            className="mt-6 rounded-lg bg-slate-900 px-5 py-3 font-medium text-white"
+            className="mt-5 rounded-lg bg-slate-900 px-5 py-3 font-medium text-white"
           >
             Back to Dashboard
           </button>
-
         </div>
       </div>
     )
   }
 
-  // -----------------------------
-  // PROCESS DATA
-  // -----------------------------
 
-  const industry = process?.industry || "Unknown Industry"
-  const processName = process?.process_name || "Unnamed Process"
-  const description = process?.description || ""
-  const objective = process?.objective || ""
+  // ---------------------------------------------------------
+  // PARSE AI RESPONSE
+  // ---------------------------------------------------------
 
-  // -----------------------------
-  // CURRENT PROCESS
-  // -----------------------------
+  let currentProcess = []
+  let problems = []
+  let opportunities = []
+  let futureProcess = []
 
-  const currentProcess = [
-    "Receive Request",
-    "Check Information",
-    "Process Request",
-    "Perform Checks",
-    "Approve",
-    "Notify Customer"
-  ]
+  if (analysis) {
+    try {
+      currentProcess =
+        typeof analysis.current_process === "string"
+          ? JSON.parse(analysis.current_process || "[]")
+          : analysis.current_process || []
 
-  // -----------------------------
-  // PROBLEMS
-  // -----------------------------
+      problems =
+        typeof analysis.problems === "string"
+          ? JSON.parse(analysis.problems || "[]")
+          : analysis.problems || []
 
-  const problems = [
-    [
-      "Manual processing",
-      "The current process contains manual activities that can cause delays.",
-      "High"
-    ],
-    [
-      "Human errors",
-      "Manual work can increase the possibility of errors.",
-      "Medium"
-    ],
-    [
-      "Process delays",
-      "Manual prioritisation and checking can slow down the process.",
-      "High"
-    ]
-  ]
+      opportunities =
+        typeof analysis.opportunities === "string"
+          ? JSON.parse(analysis.opportunities || "[]")
+          : analysis.opportunities || []
 
-  // -----------------------------
-  // AI OPPORTUNITIES
-  // -----------------------------
+      futureProcess =
+        typeof analysis.future_process === "string"
+          ? JSON.parse(analysis.future_process || "[]")
+          : analysis.future_process || []
+    } catch (err) {
+      console.error("ANALYSIS PARSING ERROR:", err)
 
-  const aiOpportunities = [
-    [
-      "Process Automation",
-      "Automate repetitive manual activities and reduce processing time."
-    ],
-    [
-      "Intelligent Prioritisation",
-      "Use AI to identify and prioritise important or urgent tasks."
-    ],
-    [
-      "Error Detection",
-      "Use AI to identify potential errors before they affect the process."
-    ]
-  ]
+      setAnalysisError(
+        "The AI analysis data could not be displayed correctly."
+      )
+    }
+  }
 
-  // -----------------------------
-  // FUTURE PROCESS
-  // -----------------------------
 
-  const futureProcess = [
-    ["Receive Request", "System"],
-    ["Analyse Information", "AI"],
-    ["Prioritise Task", "AI"],
-    ["Perform Automated Checks", "AI"],
-    ["Approve Exceptions", "Human"],
-    ["Notify Customer", "AI"]
-  ]
+  // ---------------------------------------------------------
+  // PAGE
+  // ---------------------------------------------------------
 
   return (
     <div className="min-h-screen bg-slate-50">
 
-      {/* -------------------------------- */}
       {/* HEADER */}
-      {/* -------------------------------- */}
 
       <header className="border-b bg-white">
 
         <div className="mx-auto max-w-7xl px-6 py-6">
 
           <p className="text-sm text-slate-500">
-            {industry} / {processName}
+            {process.industry} / {process.process_name}
           </p>
 
           <h1 className="mt-1 text-2xl font-bold text-slate-900">
@@ -193,12 +244,12 @@ function Analysis() {
 
             <p className="text-sm text-slate-800">
               <strong>Description:</strong>{" "}
-              {description || "No description provided."}
+              {process.description}
             </p>
 
             <p className="mt-3 text-sm text-slate-800">
               <strong>Business Objective:</strong>{" "}
-              {objective || "No business objective provided."}
+              {process.objective}
             </p>
 
           </div>
@@ -208,193 +259,295 @@ function Analysis() {
       </header>
 
 
-      {/* -------------------------------- */}
-      {/* MAIN CONTENT */}
-      {/* -------------------------------- */}
-
       <main className="mx-auto max-w-7xl space-y-6 px-6 py-8">
 
+        {/* EXISTING ANALYSIS ERROR */}
 
-        {/* -------------------------------- */}
-        {/* CURRENT PROCESS */}
-        {/* -------------------------------- */}
+        {analysisError && !analysis && (
+          <section className="rounded-xl bg-white p-6 shadow-sm">
 
-        <section className="rounded-xl bg-white p-6 shadow-sm">
+            <p className="text-sm text-slate-500">
+              No AI analysis has been generated for this process yet.
+            </p>
 
-          <h2 className="text-lg font-semibold text-slate-900">
-            Current Process
-          </h2>
+          </section>
+        )}
 
-          <div className="mt-5 flex flex-wrap items-center gap-3">
 
-            {currentProcess.map((step, index) => (
+        {/* GENERATE AI ANALYSIS */}
 
-              <div
-                key={step}
-                className="flex items-center gap-3"
-              >
+        {!analysis && (
 
-                <div className="rounded-lg border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-900">
-                  {step}
-                </div>
+          <section className="rounded-xl bg-white p-6 shadow-sm">
 
-                {index < currentProcess.length - 1 && (
-                  <span className="text-slate-400">
-                    →
-                  </span>
-                )}
+            <h2 className="text-lg font-semibold">
+              AI Analysis
+            </h2>
 
+            <p className="mt-2 text-sm text-slate-500">
+              Generate an AI-powered analysis of this business process.
+            </p>
+
+            <button
+              onClick={generateAIAnalysis}
+              disabled={generating}
+              className="mt-5 rounded-lg bg-slate-900 px-5 py-3 font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {generating
+                ? "Generating AI Analysis..."
+                : "Generate AI Analysis"}
+            </button>
+
+            {error && (
+              <div className="mt-4 rounded-lg bg-red-50 p-4 text-sm text-red-700">
+                {error}
               </div>
+            )}
 
-            ))}
+          </section>
 
-          </div>
-
-        </section>
+        )}
 
 
-        {/* -------------------------------- */}
-        {/* PROBLEMS IDENTIFIED */}
-        {/* -------------------------------- */}
+        {/* CURRENT PROCESS */}
 
-        <section className="rounded-xl bg-white p-6 shadow-sm">
+        {analysis && (
 
-          <h2 className="text-lg font-semibold text-slate-900">
-            Problems Identified
-          </h2>
+          <section className="rounded-xl bg-white p-6 shadow-sm">
 
-          <div className="mt-5 space-y-3">
+            <h2 className="text-lg font-semibold">
+              Current Process
+            </h2>
 
-            {problems.map(
-              ([activity, problem, severity]) => (
+            <div className="mt-5 flex flex-wrap items-center gap-3">
 
-                <div
-                  key={activity}
-                  className="flex items-center justify-between rounded-lg border border-slate-300 p-4"
-                >
+              {currentProcess.length > 0 ? (
+                currentProcess.map((step, index) => (
 
-                  <div>
+                  <div
+                    key={`${step}-${index}`}
+                    className="flex items-center gap-3"
+                  >
 
-                    <p className="font-medium text-slate-900">
-                      {activity}
-                    </p>
+                    <div className="rounded-lg border bg-slate-50 px-4 py-3 text-sm">
+                      {typeof step === "string"
+                        ? step
+                        : step.activity || step.name || JSON.stringify(step)}
+                    </div>
 
-                    <p className="text-sm text-slate-500">
-                      {problem}
-                    </p>
+                    {index < currentProcess.length - 1 && (
+                      <span className="text-slate-400">
+                        →
+                      </span>
+                    )}
 
                   </div>
 
-                  <span className="rounded-full bg-red-100 px-3 py-1 text-xs text-red-700">
-                    {severity}
-                  </span>
+                ))
+              ) : (
+                <p className="text-sm text-slate-500">
+                  No current process steps available.
+                </p>
+              )}
 
-                </div>
+            </div>
 
-              )
-            )}
+          </section>
 
-          </div>
-
-        </section>
+        )}
 
 
-        {/* -------------------------------- */}
+        {/* PROBLEMS */}
+
+        {analysis && (
+
+          <section className="rounded-xl bg-white p-6 shadow-sm">
+
+            <h2 className="text-lg font-semibold">
+              Problems Identified
+            </h2>
+
+            <div className="mt-5 space-y-3">
+
+              {problems.length > 0 ? (
+                problems.map((item, index) => (
+
+                  <div
+                    key={`${item.activity || "problem"}-${index}`}
+                    className="flex items-center justify-between rounded-lg border p-4"
+                  >
+
+                    <div>
+
+                      <p className="font-medium">
+                        {item.activity || item.title || "Problem"}
+                      </p>
+
+                      <p className="text-sm text-slate-500">
+                        {item.problem || item.description || ""}
+                      </p>
+
+                    </div>
+
+                    <span className="rounded-full bg-red-100 px-3 py-1 text-xs text-red-700">
+                      {item.severity || "Medium"}
+                    </span>
+
+                  </div>
+
+                ))
+              ) : (
+                <p className="text-sm text-slate-500">
+                  No problems identified.
+                </p>
+              )}
+
+            </div>
+
+          </section>
+
+        )}
+
+
         {/* AI OPPORTUNITIES */}
-        {/* -------------------------------- */}
 
-        <section className="rounded-xl bg-white p-6 shadow-sm">
+        {analysis && (
 
-          <h2 className="text-lg font-semibold text-slate-900">
-            AI Opportunities
-          </h2>
+          <section className="rounded-xl bg-white p-6 shadow-sm">
 
-          <div className="mt-5 grid gap-4 md:grid-cols-3">
+            <h2 className="text-lg font-semibold">
+              AI Opportunities
+            </h2>
 
-            {aiOpportunities.map(
-              ([title, opportunity]) => (
+            <div className="mt-5 grid gap-4 md:grid-cols-3">
 
-                <div
-                  key={title}
-                  className="rounded-lg border border-slate-300 p-5"
-                >
+              {opportunities.length > 0 ? (
+                opportunities.map((item, index) => (
 
-                  <h3 className="font-semibold text-slate-900">
-                    {title}
-                  </h3>
+                  <div
+                    key={`${item.title || "opportunity"}-${index}`}
+                    className="rounded-lg border p-5"
+                  >
 
-                  <p className="mt-2 text-sm text-slate-500">
-                    {opportunity}
-                  </p>
+                    <h3 className="font-semibold">
+                      {item.title || "AI Opportunity"}
+                    </h3>
 
-                </div>
+                    <p className="mt-2 text-sm text-slate-500">
+                      {item.description || ""}
+                    </p>
 
-              )
-            )}
+                  </div>
 
-          </div>
+                ))
+              ) : (
+                <p className="text-sm text-slate-500">
+                  No AI opportunities available.
+                </p>
+              )}
 
-        </section>
+            </div>
+
+          </section>
+
+        )}
 
 
-        {/* -------------------------------- */}
         {/* FUTURE PROCESS */}
-        {/* -------------------------------- */}
 
-        <section className="rounded-xl bg-white p-6 shadow-sm">
+        {analysis && (
 
-          <h2 className="text-lg font-semibold text-slate-900">
-            Future Process
-          </h2>
+          <section className="rounded-xl bg-white p-6 shadow-sm">
 
-          <div className="mt-5 space-y-3">
+            <h2 className="text-lg font-semibold">
+              Future Process
+            </h2>
 
-            {futureProcess.map(
-              ([activity, responsibility], index) => (
+            <div className="mt-5 space-y-3">
 
-                <div
-                  key={activity}
-                  className="flex items-center gap-4"
-                >
+              {futureProcess.length > 0 ? (
+                futureProcess.map((item, index) => (
 
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-900 text-sm text-white">
-                    {index + 1}
+                  <div
+                    key={`${item.activity || "step"}-${index}`}
+                    className="flex items-center gap-4"
+                  >
+
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-900 text-sm text-white">
+                      {index + 1}
+                    </div>
+
+                    <div className="flex flex-1 items-center justify-between rounded-lg border p-4">
+
+                      <span className="font-medium">
+                        {item.activity || item.name || "Process step"}
+                      </span>
+
+                      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs">
+                        {item.responsibility || "AI / Human"}
+                      </span>
+
+                    </div>
+
                   </div>
 
-                  <div className="flex flex-1 items-center justify-between rounded-lg border border-slate-300 p-4">
+                ))
+              ) : (
+                <p className="text-sm text-slate-500">
+                  No future process available.
+                </p>
+              )}
 
-                    <span className="font-medium text-slate-900">
-                      {activity}
-                    </span>
+            </div>
 
-                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-700">
-                      {responsibility}
-                    </span>
+          </section>
 
-                  </div>
+        )}
 
-                </div>
 
-              )
-            )}
+        {/* GENERATION ERROR */}
 
+        {error && analysis && (
+
+          <div className="rounded-lg bg-red-50 p-4 text-sm text-red-700">
+            {error}
           </div>
 
-        </section>
+        )}
 
 
-        {/* -------------------------------- */}
-        {/* BACK BUTTON */}
-        {/* -------------------------------- */}
+        {/* ACTIONS */}
 
-        <div className="pt-2 pb-8">
+        <div className="flex gap-3 pb-8">
 
           <button
             onClick={() => navigate("/")}
-            className="rounded-lg bg-slate-900 px-5 py-3 font-medium text-white hover:bg-slate-800"
+            className="rounded-lg bg-slate-900 px-5 py-3 font-medium text-white"
           >
             Back to Dashboard
           </button>
+
+          {analysis && (
+
+            <button
+              onClick={() =>
+                navigate(`/process/${id}/compare`)
+              }
+              className="rounded-lg border bg-white px-5 py-3 font-medium"
+            >
+              Compare
+            </button>
+          )}
+
+          {analysis && (
+              <button
+                onClick={generateAIAnalysis}
+                disabled={generating}
+                className="rounded-lg border bg-white px-5 py-3 font-medium disabled:opacity-50"
+              >
+                {generating ? "Regenerating..." : "Regenerate AI Analysis"}
+              </button>
+            )}
 
         </div>
 

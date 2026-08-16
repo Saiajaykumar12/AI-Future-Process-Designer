@@ -10,25 +10,21 @@ function App() {
     <BrowserRouter>
       <Routes>
 
-        {/* Dashboard */}
         <Route
           path="/"
           element={<Dashboard />}
         />
 
-        {/* Create New Process */}
         <Route
           path="/process/new"
           element={<NewProcess />}
         />
 
-        {/* AI Process Analysis */}
         <Route
-          path="/process/:processId"
+          path="/process/:id"
           element={<Analysis />}
         />
 
-        {/* Process Comparison */}
         <Route
           path="/process/:id/compare"
           element={<Comparison />}
