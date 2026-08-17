@@ -29,7 +29,7 @@ function Analysis() {
         setError("")
 
         const response = await fetch(
-          `http://127.0.0.1:8000/api/processes/${id}`
+          `${import.meta.env.VITE_API_URL}/api/processes/${id}`
         )
 
         if (!response.ok) {
@@ -71,7 +71,7 @@ function Analysis() {
 
       try {
         const response = await fetch(
-          `http://127.0.0.1:8000/api/analyses/process/${id}`
+          `${import.meta.env.VITE_API_URL}/api/analyses/process/${id}`
         )
 
         if (response.ok) {
@@ -104,7 +104,7 @@ function Analysis() {
       setError("")
 
       const response = await fetch(
-        `http://127.0.0.1:8000/api/analyses/generate/${id}`,
+        `${import.meta.env.VITE_API_URL}/api/analyses/generate/${id}`,
         {
           method: "POST",
         }

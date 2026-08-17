@@ -1,6 +1,10 @@
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 
+const API_BASE_URL = (
+  import.meta.env.VITE_API_URL || "http://127.0.0.1:8000"
+).replace(/\/$/, "")
+
 function NewProcess() {
   const navigate = useNavigate()
 
@@ -35,7 +39,7 @@ function NewProcess() {
       setLoading(true)
 
       const response = await fetch(
-        "http://127.0.0.1:8000/api/processes",
+        `${API_BASE_URL}/api/processes`,
         {
           method: "POST",
           headers: {
@@ -50,27 +54,55 @@ function NewProcess() {
         }
       )
 
-      const data = await response.json()
+      // Read the response safely
+      const responseText = await response.text()
+
+      let data = null
+
+      if (responseText.trim()) {
+        try {
+          data = JSON.parse(responseText)
+        } catch (parseError) {
+          console.error("Invalid JSON response:", responseText)
+
+          throw new Error(
+            "The backend returned an invalid response. Please check that the backend API is running."
+          )
+        }
+      }
 
       if (!response.ok) {
         throw new Error(
-          data.detail || "Could not create process."
+          data?.detail ||
+            `Could not create process. Server returned ${response.status}.`
         )
       }
 
-      navigate(`/process/${data.id}`)
+      if (!data || !data.id) {
+        throw new Error(
+          "Process was not created correctly. The backend did not return a process ID."
+        )
+      }
 
+      console.log("PROCESS CREATED:", data)
+
+      navigate(`/process/${data.id}`)
     } catch (err) {
       console.error("CREATE PROCESS ERROR:", err)
 
-      setError(
-        err.message || "Could not connect to the backend."
-      )
+      if (err instanceof TypeError && err.message === "Failed to fetch") {
+        setError(
+          `Could not connect to the backend at ${API_BASE_URL}. Make sure the FastAPI server is running.`
+        )
+      } else {
+        setError(
+          err.message || "Could not create the process."
+        )
+      }
     } finally {
       setLoading(false)
     }
   }
-
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -227,13 +259,28 @@ function NewProcess() {
           </div>
 
 
+          {/* API INFORMATION */}
+
+          <div className="mt-6 rounded-lg border border-slate-200 bg-slate-50 p-4">
+
+            <p className="text-xs font-medium text-slate-500">
+              Backend API
+            </p>
+
+            <p className="mt-1 break-all text-xs text-slate-700">
+              {API_BASE_URL}
+            </p>
+
+          </div>
+
+
           {/* ERROR */}
 
           {error && (
 
             <div className="mt-6 rounded-lg border border-red-200 bg-red-50 p-4">
 
-              <p className="text-sm text-red-700">
+              <p className="text-sm font-medium text-red-700">
                 {error}
               </p>
 
@@ -249,7 +296,8 @@ function NewProcess() {
             <button
               type="button"
               onClick={() => navigate("/")}
-              className="rounded-lg border border-slate-300 bg-white px-5 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+              disabled={loading}
+              className="rounded-lg border border-slate-300 bg-white px-5 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Cancel
             </button>
@@ -291,6 +339,7 @@ function NewProcess() {
 
             </div>
 
+
             <div>
 
               <div className="text-sm font-semibold">
@@ -302,6 +351,7 @@ function NewProcess() {
               </p>
 
             </div>
+
 
             <div>
 

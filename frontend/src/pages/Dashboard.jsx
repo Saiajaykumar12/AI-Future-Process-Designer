@@ -1,268 +1,248 @@
-import { useEffect, useState } from "react"
-import { useNavigate } from "react-router-dom"
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+
+const API_BASE_URL =
+  import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 
 function Dashboard() {
-  const navigate = useNavigate()
+  const [processes, setProcesses] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  const [processes, setProcesses] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState("")
-
-  const loadProcesses = async () => {
+  const fetchProcesses = async () => {
     try {
-      setLoading(true)
-      setError("")
+      setLoading(true);
+      setError("");
 
-      const response = await fetch(
-        "http://127.0.0.1:8000/api/processes"
-      )
+      const response = await fetch(`${API_BASE_URL}/api/processes`);
 
       if (!response.ok) {
-        throw new Error("Could not load processes")
+        throw new Error(
+          `Failed to load processes (${response.status})`
+        );
       }
 
-      const data = await response.json()
-      setProcesses(data)
+      const contentType = response.headers.get("content-type") || "";
+
+      if (!contentType.includes("application/json")) {
+        throw new Error("Backend returned an invalid response.");
+      }
+
+      const data = await response.json();
+
+      if (!Array.isArray(data)) {
+        throw new Error("Invalid process data received from backend.");
+      }
+
+      setProcesses(data);
     } catch (err) {
-      console.error("Dashboard error:", err)
-      setError(err.message || "Could not load processes.")
+      console.error("Dashboard error:", err);
+      setError(err.message || "Failed to load processes.");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   useEffect(() => {
-    loadProcesses()
-  }, [])
+    fetchProcesses();
+  }, []);
 
-  const analysedCount = processes.filter(
-    (process) => process.status === "Analysed"
-  ).length
+  const totalProcesses = processes.length;
 
-  const pendingCount = processes.filter(
-    (process) => process.status !== "Analysed"
-  ).length
+  const analysedProcesses = processes.filter(
+    (process) =>
+      process.status?.toLowerCase() === "analysed" ||
+      process.status?.toLowerCase() === "analyzed"
+  ).length;
+
+  const pendingProcesses = processes.filter(
+    (process) =>
+      !process.status ||
+      process.status.toLowerCase() === "pending"
+  ).length;
 
   return (
     <div className="min-h-screen bg-slate-50">
 
-      {/* HEADER */}
-
+      {/* Header */}
       <header className="border-b bg-white">
-
-        <div className="mx-auto max-w-7xl px-6 py-6">
-
-          <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+        <div className="mx-auto max-w-7xl px-6 py-5">
+          <div className="flex items-center justify-between">
 
             <div>
+              <p className="text-sm font-medium text-slate-500">
+                AI FUTURE PROCESS DESIGNER
+              </p>
 
-              <div className="flex items-center gap-3">
-
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-900 text-lg font-bold text-white">
-                  AI
-                </div>
-
-                <div>
-
-                  <h1 className="text-2xl font-bold text-slate-900">
-                    AI Future Process Designer
-                  </h1>
-
-                  <p className="text-sm text-slate-500">
-                    AI-powered business process transformation
-                  </p>
-
-                </div>
-
-              </div>
-
+              <h1 className="mt-1 text-2xl font-bold text-slate-900">
+                Process Transformation Dashboard
+              </h1>
             </div>
 
-
-            <button
-              onClick={() => navigate("/process/new")}
-              className="rounded-lg bg-slate-900 px-5 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800"
+            <Link
+              to="/process/new"
+              className="rounded-lg bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
             >
-              + New Process
-            </button>
+              + New Analysis
+            </Link>
 
           </div>
-
         </div>
-
       </header>
 
+      {/* Main */}
+      <main className="mx-auto max-w-7xl px-6 py-8">
 
-      {/* MAIN */}
+        {/* Hero */}
+        <section className="rounded-2xl bg-slate-900 px-8 py-10 text-white shadow-sm">
 
-      <main className="mx-auto max-w-7xl space-y-6 px-6 py-8">
+          <p className="text-sm font-semibold uppercase tracking-wide text-blue-200">
+            Business Process Transformation
+          </p>
 
+          <h2 className="mt-3 max-w-3xl text-3xl font-bold tracking-tight">
+            Design smarter processes with AI
+          </h2>
 
-        {/* HERO */}
+          <p className="mt-4 max-w-3xl text-base leading-7 text-slate-300">
+            Analyse your current business processes, identify operational
+            problems, discover AI opportunities, and design an improved
+            future-state process.
+          </p>
 
-        <section className="rounded-2xl bg-slate-900 p-8 text-white shadow-sm">
-
-          <div className="max-w-3xl">
-
-            <p className="text-sm font-medium text-slate-300">
-              BUSINESS PROCESS TRANSFORMATION
-            </p>
-
-            <h2 className="mt-3 text-3xl font-bold tracking-tight">
-              Design smarter processes with AI
-            </h2>
-
-            <p className="mt-3 text-sm leading-6 text-slate-300 md:text-base">
-              Analyse your current business processes, identify operational
-              problems, discover AI opportunities, and design an improved
-              future-state process.
-            </p>
-
-            <button
-              onClick={() => navigate("/process/new")}
-              className="mt-6 rounded-lg bg-white px-5 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-100"
+          <div className="mt-7">
+            <Link
+              to="/process/new"
+              className="inline-flex items-center rounded-lg bg-white px-5 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-100"
             >
               Start a New Analysis →
-            </button>
-
+            </Link>
           </div>
 
         </section>
 
-
-        {/* STATISTICS */}
-
-        <section className="grid gap-4 md:grid-cols-3">
-
-          <div className="rounded-xl bg-white p-6 shadow-sm">
-
-            <p className="text-sm text-slate-500">
-              Total Processes
-            </p>
-
-            <p className="mt-2 text-3xl font-bold text-slate-900">
-              {processes.length}
-            </p>
-
-            <p className="mt-1 text-xs text-slate-500">
-              Business processes created
-            </p>
-
-          </div>
-
-
-          <div className="rounded-xl bg-white p-6 shadow-sm">
-
-            <p className="text-sm text-slate-500">
-              AI Analysed
-            </p>
-
-            <p className="mt-2 text-3xl font-bold text-slate-900">
-              {analysedCount}
-            </p>
-
-            <p className="mt-1 text-xs text-slate-500">
-              Processes transformed with AI
-            </p>
-
-          </div>
-
-
-          <div className="rounded-xl bg-white p-6 shadow-sm">
-
-            <p className="text-sm text-slate-500">
-              Pending Analysis
-            </p>
-
-            <p className="mt-2 text-3xl font-bold text-slate-900">
-              {pendingCount}
-            </p>
-
-            <p className="mt-1 text-xs text-slate-500">
-              Processes waiting for AI analysis
-            </p>
-
-          </div>
-
-        </section>
-
-
-        {/* ERROR */}
-
+        {/* Error */}
         {error && (
+          <div className="mt-6 flex items-center justify-between rounded-xl border border-red-200 bg-red-50 px-5 py-4">
 
-          <div className="flex items-center justify-between rounded-lg border border-red-200 bg-red-50 p-4">
+            <div>
+              <p className="font-medium text-red-700">
+                Unable to load processes
+              </p>
 
-            <p className="text-sm text-red-700">
-              {error}
-            </p>
+              <p className="mt-1 text-sm text-red-600">
+                {error}
+              </p>
+            </div>
 
             <button
-              onClick={loadProcesses}
-              className="rounded-lg bg-white px-4 py-2 text-sm font-medium text-red-700 shadow-sm"
+              onClick={fetchProcesses}
+              className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-red-700 shadow-sm ring-1 ring-red-200 hover:bg-red-50"
             >
               Retry
             </button>
 
           </div>
-
         )}
 
+        {/* Statistics */}
+        <section className="mt-7 grid gap-5 md:grid-cols-3">
 
-        {/* PROCESS WORKSPACE */}
+          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+            <p className="text-sm font-medium text-slate-500">
+              Total Processes
+            </p>
 
-        <section className="overflow-hidden rounded-xl bg-white shadow-sm">
+            <p className="mt-3 text-3xl font-bold text-slate-900">
+              {loading ? "—" : totalProcesses}
+            </p>
 
-          <div className="flex flex-col gap-3 border-b p-6 md:flex-row md:items-center md:justify-between">
+            <p className="mt-2 text-sm text-slate-500">
+              Business processes created
+            </p>
+          </div>
 
-            <div>
 
-              <h2 className="text-lg font-semibold text-slate-900">
-                Process Workspace
-              </h2>
+          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+            <p className="text-sm font-medium text-slate-500">
+              AI Analysed
+            </p>
 
-              <p className="mt-1 text-sm text-slate-500">
-                Manage and analyse your business processes.
-              </p>
+            <p className="mt-3 text-3xl font-bold text-slate-900">
+              {loading ? "—" : analysedProcesses}
+            </p>
+
+            <p className="mt-2 text-sm text-slate-500">
+              Processes transformed with AI
+            </p>
+          </div>
+
+
+          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+            <p className="text-sm font-medium text-slate-500">
+              Pending Analysis
+            </p>
+
+            <p className="mt-3 text-3xl font-bold text-slate-900">
+              {loading ? "—" : pendingProcesses}
+            </p>
+
+            <p className="mt-2 text-sm text-slate-500">
+              Processes waiting for AI analysis
+            </p>
+          </div>
+
+        </section>
+
+
+        {/* Process Workspace */}
+        <section className="mt-7 rounded-xl border border-slate-200 bg-white shadow-sm">
+
+          <div className="border-b border-slate-200 px-6 py-5">
+
+            <div className="flex items-center justify-between">
+
+              <div>
+                <h2 className="text-xl font-semibold text-slate-900">
+                  Process Workspace
+                </h2>
+
+                <p className="mt-1 text-sm text-slate-500">
+                  Manage and analyse your business processes.
+                </p>
+              </div>
+
+              <Link
+                to="/process/new"
+                className="text-sm font-semibold text-slate-900 hover:underline"
+              >
+                Create Process →
+              </Link>
 
             </div>
-
-            {!loading && processes.length > 0 && (
-
-              <span className="text-sm text-slate-500">
-                {processes.length} process
-                {processes.length !== 1 ? "es" : ""}
-              </span>
-
-            )}
 
           </div>
 
 
-          {/* LOADING */}
-
+          {/* Loading */}
           {loading && (
+            <div className="px-6 py-12 text-center">
 
-            <div className="p-10 text-center">
-
-              <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-slate-900"></div>
+              <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-slate-900" />
 
               <p className="mt-4 text-sm text-slate-500">
                 Loading processes...
               </p>
 
             </div>
-
           )}
 
 
-          {/* EMPTY */}
-
+          {/* Empty state */}
           {!loading && !error && processes.length === 0 && (
+            <div className="px-6 py-14 text-center">
 
-            <div className="p-12 text-center">
-
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-slate-100 text-xl">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-slate-100 text-2xl">
                 +
               </div>
 
@@ -270,223 +250,177 @@ function Dashboard() {
                 No processes yet
               </h3>
 
-              <p className="mx-auto mt-2 max-w-md text-sm text-slate-500">
-                Create your first business process and let AI identify
-                problems, opportunities, and future-state improvements.
+              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
+                Create your first business process and use AI to identify
+                problems, opportunities, and a future-state process.
               </p>
 
-              <button
-                onClick={() => navigate("/process/new")}
-                className="mt-5 rounded-lg bg-slate-900 px-5 py-3 text-sm font-medium text-white"
+              <Link
+                to="/process/new"
+                className="mt-6 inline-flex rounded-lg bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800"
               >
-                Create First Process
-              </button>
+                Start Your First Analysis →
+              </Link>
 
             </div>
-
           )}
 
 
-          {/* PROCESS LIST */}
+          {/* Process list */}
+          {!loading && !error && processes.length > 0 && (
+            <div className="divide-y divide-slate-200">
 
-          {!loading && processes.length > 0 && (
+              {processes.map((process) => {
 
-            <div className="divide-y">
+                const isAnalysed =
+                  process.status?.toLowerCase() === "analysed" ||
+                  process.status?.toLowerCase() === "analyzed";
 
-              {processes.map((process) => (
-
-                <div
-                  key={process.id}
-                  className="p-6 transition hover:bg-slate-50"
-                >
-
-                  <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-
-                    {/* PROCESS INFORMATION */}
+                return (
+                  <div
+                    key={process.id}
+                    className="flex flex-col gap-4 px-6 py-5 transition hover:bg-slate-50 md:flex-row md:items-center md:justify-between"
+                  >
 
                     <div className="min-w-0">
 
                       <div className="flex flex-wrap items-center gap-3">
 
-                        <h3 className="text-base font-semibold text-slate-900">
+                        <h3 className="truncate text-base font-semibold text-slate-900">
                           {process.process_name}
                         </h3>
 
                         <span
                           className={`rounded-full px-3 py-1 text-xs font-medium ${
-                            process.status === "Analysed"
+                            isAnalysed
                               ? "bg-green-100 text-green-700"
-                              : "bg-yellow-100 text-yellow-700"
+                              : "bg-amber-100 text-amber-700"
                           }`}
                         >
-                          {process.status}
+                          {process.status || "Pending"}
                         </span>
 
                       </div>
 
+                      <p className="mt-1 text-sm text-slate-500">
+                        {process.industry}
+                      </p>
 
-                      <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-slate-500">
-
-                        <span>
-                          {process.industry}
-                        </span>
-
-                        <span>•</span>
-
-                        <span>
-                          Process #{process.id}
-                        </span>
-
-                      </div>
-
-
-                      <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-500">
+                      <p className="mt-2 line-clamp-2 max-w-3xl text-sm leading-6 text-slate-600">
                         {process.description}
                       </p>
 
                     </div>
 
 
-                    {/* ACTIONS */}
+                    <div className="flex shrink-0 gap-3">
 
-                    <div className="flex shrink-0 flex-wrap gap-3">
-
-                      <button
-                        onClick={() =>
-                          navigate(`/process/${process.id}`)
-                        }
-                        className="rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800"
+                      <Link
+                        to={`/process/${process.id}`}
+                        className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
                       >
-                        Open Analysis
-                      </button>
+                        View Process
+                      </Link>
 
-
-                      {process.status === "Analysed" && (
-
-                        <button
-                          onClick={() =>
-                            navigate(
-                              `/process/${process.id}/compare`
-                            )
-                          }
-                          className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                      {isAnalysed && (
+                        <Link
+                          to={`/analysis/${process.id}`}
+                          className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
                         >
-                          Compare
-                        </button>
-
+                          View Analysis
+                        </Link>
                       )}
 
                     </div>
 
                   </div>
-
-                </div>
-
-              ))}
+                );
+              })}
 
             </div>
-
           )}
 
         </section>
 
 
-        {/* HOW IT WORKS */}
+        {/* How it works */}
+        <section className="mt-7 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
 
-        <section className="rounded-xl bg-white p-6 shadow-sm">
-
-          <h2 className="text-lg font-semibold text-slate-900">
+          <h2 className="text-xl font-semibold text-slate-900">
             How it works
           </h2>
 
-          <div className="mt-6 grid gap-5 md:grid-cols-4">
+          <div className="mt-6 grid gap-6 md:grid-cols-4">
 
             <div>
-
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-900 text-sm font-bold text-white">
-                1
+                01
               </div>
 
-              <h3 className="mt-3 font-semibold">
-                Describe
+              <h3 className="mt-4 font-semibold text-slate-900">
+                Define Process
               </h3>
 
-              <p className="mt-1 text-sm text-slate-500">
-                Describe your current business process and objective.
+              <p className="mt-2 text-sm leading-6 text-slate-500">
+                Describe your current business process and its objective.
               </p>
-
             </div>
 
 
             <div>
-
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-900 text-sm font-bold text-white">
-                2
+                02
               </div>
 
-              <h3 className="mt-3 font-semibold">
-                Analyse
+              <h3 className="mt-4 font-semibold text-slate-900">
+                AI Analysis
               </h3>
 
-              <p className="mt-1 text-sm text-slate-500">
-                AI identifies process steps, problems, and opportunities.
+              <p className="mt-2 text-sm leading-6 text-slate-500">
+                Gemini analyses the process and identifies operational
+                problems and AI opportunities.
               </p>
-
             </div>
 
 
             <div>
-
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-900 text-sm font-bold text-white">
-                3
+                03
               </div>
 
-              <h3 className="mt-3 font-semibold">
-                Transform
+              <h3 className="mt-4 font-semibold text-slate-900">
+                Future State
               </h3>
 
-              <p className="mt-1 text-sm text-slate-500">
-                Generate an AI-enabled future-state process.
+              <p className="mt-2 text-sm leading-6 text-slate-500">
+                Review the AI-enabled future process and responsibilities.
               </p>
-
             </div>
 
 
             <div>
-
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-900 text-sm font-bold text-white">
-                4
+                04
               </div>
 
-              <h3 className="mt-3 font-semibold">
-                Compare
+              <h3 className="mt-4 font-semibold text-slate-900">
+                Compare & Export
               </h3>
 
-              <p className="mt-1 text-sm text-slate-500">
-                Compare the current, transition, and future states.
+              <p className="mt-2 text-sm leading-6 text-slate-500">
+                Compare current and future states and export the analysis
+                as a PDF.
               </p>
-
             </div>
 
           </div>
 
         </section>
 
-
-        {/* FOOTER */}
-
-        <footer className="pb-6 pt-2 text-center">
-
-          <p className="text-xs text-slate-400">
-            AI Future Process Designer
-          </p>
-
-        </footer>
-
       </main>
 
     </div>
-  )
+  );
 }
 
-export default Dashboard
+export default Dashboard;
