@@ -16,41 +16,50 @@ from schemas import (
 from ai_service import generate_process_analysis
 
 
-# ---------------------------------------------------------
+# =========================================================
 # DATABASE
-# ---------------------------------------------------------
+# =========================================================
 
 Base.metadata.create_all(bind=engine)
 
 
-# ---------------------------------------------------------
-# APP
-# ---------------------------------------------------------
+# =========================================================
+# FASTAPI APP
+# =========================================================
 
 app = FastAPI(
-    title="AI Future Process Designer API"
+    title="AI Future Process Designer API",
+    version="1.0.0",
 )
 
 
-# ---------------------------------------------------------
+# =========================================================
 # CORS
-# ---------------------------------------------------------
+# =========================================================
 
 app.add_middleware(
     CORSMiddleware,
+
+    # Local development
     allow_origins=[
         "http://localhost:5173",
+        "http://127.0.0.1:5173",
+
+        # Vercel production frontend
         "https://ai-future-process-designer-three.vercel.app",
     ],
-    allow_credentials=True,
+
+    allow_credentials=False,
+
     allow_methods=["*"],
+
     allow_headers=["*"],
 )
 
 
-# ---------------------------------------------------------
+# =========================================================
 # ROOT
-# ---------------------------------------------------------
+# =========================================================
 
 @app.get("/")
 def root():
@@ -59,9 +68,20 @@ def root():
     }
 
 
-# ---------------------------------------------------------
+# =========================================================
+# HEALTH CHECK
+# =========================================================
+
+@app.get("/health")
+def health():
+    return {
+        "status": "ok"
+    }
+
+
+# =========================================================
 # CREATE PROCESS
-# ---------------------------------------------------------
+# =========================================================
 
 @app.post(
     "/api/processes",
@@ -71,24 +91,35 @@ def create_process(
     process: ProcessCreate,
     db: Session = Depends(get_db)
 ):
-    new_process = Process(
-        industry=process.industry,
-        process_name=process.process_name,
-        description=process.description,
-        objective=process.objective,
-        status="Pending",
-    )
+    try:
+        new_process = Process(
+            industry=process.industry,
+            process_name=process.process_name,
+            description=process.description,
+            objective=process.objective,
+            status="Pending",
+        )
 
-    db.add(new_process)
-    db.commit()
-    db.refresh(new_process)
+        db.add(new_process)
+        db.commit()
+        db.refresh(new_process)
 
-    return new_process
+        return new_process
+
+    except Exception as e:
+        db.rollback()
+
+        print("CREATE PROCESS ERROR:", e)
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"Could not create process: {str(e)}"
+        )
 
 
-# ---------------------------------------------------------
+# =========================================================
 # GET ALL PROCESSES
-# ---------------------------------------------------------
+# =========================================================
 
 @app.get(
     "/api/processes",
@@ -97,16 +128,27 @@ def create_process(
 def get_processes(
     db: Session = Depends(get_db)
 ):
-    return (
-        db.query(Process)
-        .order_by(Process.id.desc())
-        .all()
-    )
+    try:
+        processes = (
+            db.query(Process)
+            .order_by(Process.id.desc())
+            .all()
+        )
+
+        return processes
+
+    except Exception as e:
+        print("GET PROCESSES ERROR:", e)
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"Could not load processes: {str(e)}"
+        )
 
 
-# ---------------------------------------------------------
+# =========================================================
 # GET SINGLE PROCESS
-# ---------------------------------------------------------
+# =========================================================
 
 @app.get(
     "/api/processes/{process_id}",
@@ -131,9 +173,9 @@ def get_process(
     return process
 
 
-# ---------------------------------------------------------
+# =========================================================
 # GENERATE AI ANALYSIS
-# ---------------------------------------------------------
+# =========================================================
 
 @app.post(
     "/api/analyses/generate/{process_id}",
@@ -143,6 +185,10 @@ def generate_analysis(
     process_id: int,
     db: Session = Depends(get_db)
 ):
+    # -----------------------------------------------------
+    # Find process
+    # -----------------------------------------------------
+
     process = (
         db.query(Process)
         .filter(Process.id == process_id)
@@ -155,6 +201,10 @@ def generate_analysis(
             detail="Process not found"
         )
 
+    # -----------------------------------------------------
+    # Generate AI result
+    # -----------------------------------------------------
+
     try:
         ai_result = generate_process_analysis(
             industry=process.industry,
@@ -163,23 +213,52 @@ def generate_analysis(
             objective=process.objective,
         )
 
-        result = json.loads(ai_result)
-
-    except json.JSONDecodeError:
-        raise HTTPException(
-            status_code=500,
-            detail="AI returned invalid JSON"
-        )
+        print("RAW AI RESULT:")
+        print(ai_result)
 
     except Exception as e:
-        print("AI ERROR:", e)
+        print("AI SERVICE ERROR:", e)
 
         raise HTTPException(
             status_code=500,
             detail=f"AI analysis failed: {str(e)}"
         )
 
-    # Make sure all expected fields exist
+    # -----------------------------------------------------
+    # Parse AI JSON
+    # -----------------------------------------------------
+
+    try:
+        # Handle possible markdown code fences
+        cleaned_result = ai_result.strip()
+
+        if cleaned_result.startswith("```json"):
+            cleaned_result = cleaned_result[7:]
+
+        elif cleaned_result.startswith("```"):
+            cleaned_result = cleaned_result[3:]
+
+        if cleaned_result.endswith("```"):
+            cleaned_result = cleaned_result[:-3]
+
+        cleaned_result = cleaned_result.strip()
+
+        result = json.loads(cleaned_result)
+
+    except json.JSONDecodeError as e:
+        print("AI JSON ERROR:", e)
+        print("INVALID AI RESPONSE:")
+        print(ai_result)
+
+        raise HTTPException(
+            status_code=500,
+            detail="AI returned invalid JSON"
+        )
+
+    # -----------------------------------------------------
+    # Extract expected fields
+    # -----------------------------------------------------
+
     current_process = result.get(
         "current_process",
         []
@@ -200,41 +279,55 @@ def generate_analysis(
         []
     )
 
+    # -----------------------------------------------------
     # Save analysis
-    new_analysis = Analysis(
-        process_id=process.id,
+    # -----------------------------------------------------
 
-        current_process=json.dumps(
-            current_process
-        ),
+    try:
+        new_analysis = Analysis(
+            process_id=process.id,
 
-        problems=json.dumps(
-            problems
-        ),
+            current_process=json.dumps(
+                current_process
+            ),
 
-        opportunities=json.dumps(
-            opportunities
-        ),
+            problems=json.dumps(
+                problems
+            ),
 
-        future_process=json.dumps(
-            future_process
-        ),
-    )
+            opportunities=json.dumps(
+                opportunities
+            ),
 
-    db.add(new_analysis)
+            future_process=json.dumps(
+                future_process
+            ),
+        )
 
-    # Update process status
-    process.status = "Analysed"
+        db.add(new_analysis)
 
-    db.commit()
-    db.refresh(new_analysis)
+        # Update process status
+        process.status = "Analysed"
 
-    return new_analysis
+        db.commit()
+        db.refresh(new_analysis)
+
+        return new_analysis
+
+    except Exception as e:
+        db.rollback()
+
+        print("SAVE ANALYSIS ERROR:", e)
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"Could not save analysis: {str(e)}"
+        )
 
 
-# ---------------------------------------------------------
+# =========================================================
 # CREATE ANALYSIS MANUALLY
-# ---------------------------------------------------------
+# =========================================================
 
 @app.post(
     "/api/analyses",
@@ -256,27 +349,42 @@ def create_analysis(
             detail="Process not found"
         )
 
-    new_analysis = Analysis(
-        process_id=analysis.process_id,
-        current_process=analysis.current_process,
-        problems=analysis.problems,
-        opportunities=analysis.opportunities,
-        future_process=analysis.future_process,
-    )
+    try:
+        new_analysis = Analysis(
+            process_id=analysis.process_id,
 
-    db.add(new_analysis)
+            current_process=analysis.current_process,
 
-    process.status = "Analysed"
+            problems=analysis.problems,
 
-    db.commit()
-    db.refresh(new_analysis)
+            opportunities=analysis.opportunities,
 
-    return new_analysis
+            future_process=analysis.future_process,
+        )
+
+        db.add(new_analysis)
+
+        process.status = "Analysed"
+
+        db.commit()
+        db.refresh(new_analysis)
+
+        return new_analysis
+
+    except Exception as e:
+        db.rollback()
+
+        print("CREATE ANALYSIS ERROR:", e)
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"Could not create analysis: {str(e)}"
+        )
 
 
-# ---------------------------------------------------------
+# =========================================================
 # GET LATEST ANALYSIS FOR PROCESS
-# ---------------------------------------------------------
+# =========================================================
 
 @app.get(
     "/api/analyses/process/{process_id}",
@@ -288,8 +396,12 @@ def get_analysis(
 ):
     analysis = (
         db.query(Analysis)
-        .filter(Analysis.process_id == process_id)
-        .order_by(Analysis.id.desc())
+        .filter(
+            Analysis.process_id == process_id
+        )
+        .order_by(
+            Analysis.id.desc()
+        )
         .first()
     )
 
